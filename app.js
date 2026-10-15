@@ -5,6 +5,12 @@ const ENV = window.env; // Mette in comunicazione ENV con window.env di Netlify,
 const SUPABASE_URL = ENV.SUPABASE_URL;
 const SUPABASE_ANON_KEY = ENV.SUPABASE_ANON_KEY;
 
+// --- CONFIGURAZIONE DUALE sia locale che Netlify ---
+/*const SUPABASE_URL = (window.env && window.env.SUPABASE_URL) || NOME_VARIABILE_DEL_TUO_ENV_CONFIG_LOCALE;
+const SUPABASE_ANON_KEY = (window.env && window.env.SUPABASE_ANON_KEY) || ALTRA_VARIABILE_DEL_TUO_ENV_CONFIG_LOCALE;*/
+
+
+
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Variabili di stato globale
