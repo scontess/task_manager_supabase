@@ -1,4 +1,6 @@
 // --- CONFIGURAZIONE SUPABASE ---
+const ENV = window.env; // Mette in comunicazione ENV con window.env di Netlify
+
 const SUPABASE_URL = ENV.SUPABASE_URL;
 const SUPABASE_ANON_KEY = ENV.SUPABASE_ANON_KEY;
 
