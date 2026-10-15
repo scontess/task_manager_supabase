@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskFlow Pro - Supabase Auth Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+
+    <!-- SCHERMATA DI LOGIN / REGISTRAZIONE -->
+    <div id="auth-container" class="flex items-center justify-center min-h-screen p-4 hidden">
+        <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 w-full max-w-md">
+            <h1 class="text-2xl font-extrabold text-gray-900 mb-2 text-center">TaskFlow Pro</h1>
+            <p class="text-sm text-gray-500 text-center mb-6">Accedi con le tue credenziali</p>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Email</label>
+                    <input type="email5" id="auth-email" placeholder="nome@esempio.com" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Password</label>
+                    <input type="password" id="auth-password" placeholder="••••••••" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button onclick="handleLogin()" class="flex-1 bg-blue-600 text-white font-medium py-3 rounded-xl hover:bg-blue-700 transition text-sm">Accedi</button>
+                    <button onclick="handleSignup()" class="flex-1 bg-gray-100 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-200 transition text-sm">Registrati</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- APPLICAZIONE PRINCIPALE (Nascosta finché non si fa il login) -->
+    <div id="app-container" class="max-w-6xl mx-auto p-6 hidden">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">TaskFlow Pro</h1>
+                <p class="text-sm text-gray-500 mt-1">Gestione attività sicura con Supabase Auth</p>
+            </div>
+            
+            <div class="flex items-center gap-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                <div class="text-right">
+                    <span id="user-email-display" class="block text-sm font-medium text-gray-700">-</span>
+                    <span id="user-role-badge" class="inline-block px-2 py-0.5 text-xs font-semibold bg-gray-200 text-gray-700 rounded-full mt-0.5">-</span>
+                </div>
+                <button onclick="handleLogout()" class="text-xs bg-rose-50 text-rose-600 hover:bg-rose-100 px-3 py-2 rounded-lg transition font-medium">
+                    Esci
+                </button>
+            </div>
+        </header>
+
+        <!-- Sezione Controlli: Ricerca e Aggiunta Task -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm lg:col-span-1 border border-gray-100 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-lg font-bold mb-4 text-gray-800">Nuovo Task</h2>
+                    <div class="space-y-3 mb-4">
+                        <input type="text" id="task-name" placeholder="Titolo del task..." class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                        <textarea id="task-desc" placeholder="Descrizione dettagliata..." rows="2" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition resize-none"></textarea>
+                    </div>
+                </div>
+                <button onclick="handleAddTask()" class="w-full bg-blue-600 text-white font-medium px-4 py-3 rounded-xl hover:bg-blue-700 transition">Salva Task</button>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm lg:col-span-2 border border-gray-100 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-lg font-bold mb-4 text-gray-800">Filtri e Ricerca</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="relative">
+                            <input type="text" id="search-input" oninput="filterTasks()" placeholder="Cerca..." class="w-full border border-gray-200 rounded-xl p-3 pl-10 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
+                            <svg class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <div>
+                            <select id="status-filter" onchange="filterTasks()" class="w-full border border-gray-200 rounded-xl p-3 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition">
+                                <option value="ALL">Tutti gli stati</option>
+                                <option value="Attivo">Attivo</option>
+                                <option value="Evaso">Evaso</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-400 flex justify-between items-center pt-2 border-t border-gray-100">
+                    <span id="task-counter">Caricamento...</span>
+                    <span>Database protetto con RLS</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabella -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider font-semibold border-b border-gray-100">
+                        <tr>
+                            <th class="p-4 pl-6">Task</th>
+                            <th class="p-4">Descrizione</th>
+                            <th class="p-4">Autore / Assegnato a</th> <!-- Nuova colonna Admin -->
+                            <th class="p-4">Stato</th>
+                            <th class="p-4">Creato il</th>
+                            <th class="p-4 pr-6 text-right">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="task-table-body" class="divide-y divide-gray-100 text-sm"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-5 right-5 space-y-2 z-50"></div>
+    
+    <script src="env-config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
