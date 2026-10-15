@@ -1,8 +1,0 @@
-PW utenti Supabase: Soccer98!!!!12  utente mie mail  
-
-Crea le variabil d'ambiente su Netlify 
-SUPABASE_URL = 'https://byzndnswbihivlajoyty.supabase.co';
-SUPABASE_ANON_KEY = 'sb_publishable_7u_2qQwEqU9AVaUUFrUrOg_a_tTQq_6';
-
-Nel campo build metti echo "window.env = { SUPABASE_URL: '$SUPABASE_URL', SUPABASE_ANON_KEY: '$SUPABASE_ANON_KEY' };" > env-config.js
-cosi da ricreare env-config.js su Netlify che leggera le variabili d'ambiente settate su Netlify
