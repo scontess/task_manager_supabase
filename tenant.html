@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Tenant - SaaS Administration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800 p-6">
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        <header class="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div>
+                <h1 class="text-2xl font-extrabold text-gray-900">Pannello Superuser</h1>
+                <p class="text-sm text-gray-500">Gestione centralizzata dei Tenant (Aziende)</p>
+            </div>
+            <button onclick="handleLogout()" class="text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 px-4 py-2.5 rounded-xl transition font-medium">Esci (Logout)</button>
+        </header>
+
+        <!-- Form Creazione Tenant -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h2 class="text-lg font-bold mb-4 text-gray-800">Registra Nuova Azienda</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Nome Azienda</label>
+                    <input type="text" id="tenant-company-name" placeholder="Es. Acme Srl" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Nome Amministratore</label>
+                    <input type="text" id="tenant-admin-name" placeholder="Mario Rossi" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Email Admin</label>
+                    <input type="email" id="tenant-admin-email" placeholder="admin@acme.com" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Password Provvisoria</label>
+                    <input type="password" id="tenant-admin-password" placeholder="••••••••" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none transition">
+                </div>
+            </div>
+            <button onclick="handleCreateTenant()" class="bg-purple-600 text-white font-medium px-5 py-3 rounded-xl hover:bg-purple-700 transition text-sm">Crea Azienda e Admin</button>
+        </div>
+
+        <!-- Elenco Aziende Esistenti -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h2 class="text-lg font-bold mb-4 text-gray-800">Aziende Registrate</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider font-semibold border-b border-gray-100">
+                        <tr>
+                            <th class="p-3 pl-4">Nome Azienda</th>
+                            <th class="p-3">ID Azienda</th>
+                            <th class="p-3">Data Creazione</th>
+                            <th class="p-3 pr-4 text-right">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="companies-table-body" class="divide-y divide-gray-100 text-sm">
+                        <tr>
+                            <td colspan="4" class="p-4 text-center text-gray-400">Caricamento aziende...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-5 right-5 space-y-2 z-50"></div>
+
+    <!-- Script di configurazione e logica separata -->
+    <script src="env-config.js"></script>
+    <script src="tenant.js"></script>
+</body>
+</html>

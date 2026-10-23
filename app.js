@@ -1,6 +1,6 @@
 // --- CONFIGURAZIONE SUPABASE ---
+const ENV = window.env;
 
-const ENV = window.env; // questo per netlify, che inietta le variabili d'ambiente in window.env
 const SUPABASE_URL = ENV.SUPABASE_URL;
 const SUPABASE_ANON_KEY = ENV.SUPABASE_ANON_KEY;
 
@@ -39,11 +39,24 @@ function setupSelectColorToggle(elementId) {
     });
 }
 
+function toggleDaysInput() {
+    const statusDue = document.getElementById('filter-status-due').value;
+    const daysWrapper = document.getElementById('days-input-wrapper');
+    if (!daysWrapper) return;
+
+    if (statusDue === 'in_scadenza') {
+        daysWrapper.classList.remove('hidden');
+    } else {
+        daysWrapper.classList.add('hidden');
+        const daysInput = document.getElementById('filter-days');
+        if (daysInput) daysInput.value = '0';
+    }
+}
+
 // --- GESTIONE SESSIONE & PROFILO MULTI-TENANT ---
 async function handleSession(session) {
     const authContainer = document.getElementById('auth-container');
     const appContainer = document.getElementById('app-container');
-    const btnCreateUser = document.getElementById('btn-open-create-user');
 
     if (!session) {
         currentUser = null;
@@ -51,15 +64,26 @@ async function handleSession(session) {
         userCompanyId = null;
         if (authContainer) authContainer.classList.remove('hidden');
         if (appContainer) appContainer.classList.add('hidden');
-        if (btnCreateUser) btnCreateUser.classList.add('hidden');
         return;
     }
 
     currentUser = session.user;
+    
+    // Recupera il profilo (compreso il ruolo dal database)
+    await fetchUserProfile();
+
+    // --- AGGIUNGI QUESTO CONTROLLO QUI ---
+    // Se l'utente è un superadmin, reindirizzalo subito a tenant.html
+    if (userRole === 'superadmin') {
+        if (!window.location.pathname.endsWith('tenant.html')) {
+            window.location.href = 'tenant.html';
+        }
+        return; // Interrompe il caricamento del resto della pagina
+    }
+    // -------------------------------------
+
     if (authContainer) authContainer.classList.add('hidden');
     if (appContainer) appContainer.classList.remove('hidden');
-
-    await fetchUserProfile();
 
     const nameDisplay = document.getElementById('user-name-display');
     if (nameDisplay) nameDisplay.innerText = allUsersMap[currentUser.id] || currentUser.email;
@@ -67,46 +91,83 @@ async function handleSession(session) {
     const badge = document.getElementById('user-role-badge');
     if (badge) {
         badge.innerText = userRole.toUpperCase();
-        badge.className = `inline-block px-2 py-0.5 text-xs font-semibold rounded-full mt-0.5 ${userRole === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`;
+        badge.className = `inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full mt-0.5 ${userRole === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`;
     }
 
-    if (btnCreateUser) {
-        if (userRole === 'admin') {
-            btnCreateUser.classList.remove('hidden');
-        } else {
-            btnCreateUser.classList.add('hidden');
-        }
-    }
-
+    const adminNavTabs = document.getElementById('admin-nav-tabs');
     const adminFieldsContainer = document.getElementById('admin-task-fields');
     const adminFiltersContainer = document.getElementById('admin-filters-container');
-    const adminUsersSection = document.getElementById('admin-users-section');
 
     if (userRole === 'admin') {
+        if (adminNavTabs) adminNavTabs.classList.remove('hidden');
         if (adminFieldsContainer) adminFieldsContainer.classList.remove('hidden');
         if (adminFiltersContainer) adminFiltersContainer.classList.remove('hidden');
-        if (adminUsersSection) adminUsersSection.classList.remove('hidden');
         populateNewTaskAssigneeDropdown();
         populateAdminFilterAssignees();
     } else {
+        if (adminNavTabs) adminNavTabs.classList.add('hidden');
         if (adminFieldsContainer) adminFieldsContainer.classList.add('hidden');
         if (adminFiltersContainer) adminFiltersContainer.classList.add('hidden');
-        if (adminUsersSection) adminUsersSection.classList.add('hidden');
     }
+
+    // Si parte SEMPRE dalla vista Task all'accesso (per admin aziendali o utenti normali)
+    switchView('tasks');
 
     loadData();
 }
 
+
 async function fetchUserProfile() {
     const { data: myProfile, error } = await _supabase
         .from('profiles')
-        .select('role, company_id, name')
+        .select(`
+            role, 
+            company_id, 
+            name,
+            companies (
+                name
+            )
+        `)
         .eq('id', currentUser.id)
         .single();
 
     if (!error && myProfile) {
         userRole = myProfile.role;
         userCompanyId = myProfile.company_id;
+
+        // Imposta dinamicamente il nome dell'azienda nell'header centrale
+        const companyNameDisplay = document.getElementById('company-name-display');
+        if (companyNameDisplay) {
+            companyNameDisplay.innerText = myProfile.companies?.name || 'Azienda non associata';
+        }
+    }
+}
+
+// --- GESTIONE CAMBIO VISTA (TASKS / USERS) ---
+function switchView(viewName) {
+    const viewTasks = document.getElementById('view-tasks');
+    const viewUsers = document.getElementById('view-users');
+    const tabTasksBtn = document.getElementById('tab-tasks-btn');
+    const tabUsersBtn = document.getElementById('tab-users-btn');
+
+    if (!viewTasks || !viewUsers) return;
+
+    if (viewName === 'tasks') {
+        viewTasks.classList.remove('hidden');
+        viewUsers.classList.add('hidden');
+        
+        if (tabTasksBtn && tabUsersBtn) {
+            tabTasksBtn.className = "bg-blue-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2";
+            tabUsersBtn.className = "bg-white text-gray-700 border border-gray-200 text-xs font-semibold px-5 py-2.5 rounded-xl hover:bg-gray-50 transition shadow-sm flex items-center gap-2";
+        }
+    } else if (viewName === 'users') {
+        viewTasks.classList.add('hidden');
+        viewUsers.classList.remove('hidden');
+        
+        if (tabTasksBtn && tabUsersBtn) {
+            tabUsersBtn.className = "bg-purple-600 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2";
+            tabTasksBtn.className = "bg-white text-gray-700 border border-gray-200 text-xs font-semibold px-5 py-2.5 rounded-xl hover:bg-gray-50 transition shadow-sm flex items-center gap-2";
+        }
     }
 }
 
@@ -123,13 +184,11 @@ async function handleLogin() {
     const { error } = await _supabase.auth.signInWithPassword({ email, password });
     if (error) {
         showToast('Credenziali non valide', 'error');
-        console.error("Errore login:", error.message); // Utile per vedere eventuali dettagli in console (F12)
+        console.error("Errore login:", error.message);
         return;
     }
 
     showToast('Login effettuato con successo!');
-    
-    // AGGIUNGI QUESTO: Ricarica i dati e aggiorna la schermata principale
     if (typeof loadData === 'function') {
         loadData();
     }
@@ -173,7 +232,7 @@ async function handleLogout() {
     showToast('Logout effettuato');
 }
 
-// --- GESTIONE MODALE CREAZIONE UTENTE (Tramite RPC) ---
+// --- GESTIONE MODALE CREAZIONE UTENTE ---
 function openCreateUserModal() {
     document.getElementById('new-user-name').value = '';
     document.getElementById('new-user-email').value = '';
@@ -196,59 +255,43 @@ async function handleAdminCreateUser() {
         return;
     }
 
-    // 1. Recupera la company_id dell'admin corrente
     const { data: adminProfile, error: adminError } = await _supabase
         .from('profiles')
         .select('company_id')
         .eq('id', currentUser.id)
         .single();
 
-    const companyId = adminProfile ? adminProfile.company_id : null;
+    const companyId = adminProfile ? adminProfile.company_id : userCompanyId;
 
     if (!companyId) {
         showToast('Errore: Impossibile determinare l’azienda dell’admin', 'error');
         return;
     }
 
-    // 2. Crea l'utente tramite il sistema nativo di Supabase Auth
-    const { data: authData, error: authError } = await _supabase.auth.signUp({
-        email: email,
-        password: password,
-        options: {
-            data: { name: name }
-        }
-    });
-
-    if (authError) {
-        showToast('Errore Auth: ' + authError.message, 'error');
-        return;
-    }
-
-    const userId = authData.user?.id;
-    if (!userId) {
-        showToast('Errore: ID utente non generato', 'error');
-        return;
-    }
-
-    // 3. Inserisce o aggiorna il record nella tabella profiles associando la company_id
-    const { error: profileError } = await _supabase
-        .from('profiles')
-        .upsert({
-            id: userId,
-            email: email,
-            name: name,
-            role: role,
-            company_id: companyId
+    try {
+        // Invoca la Edge Function per la creazione sicura senza perdita di sessione
+        const { data, error } = await _supabase.functions.invoke('create-user', {
+            body: { 
+                email: email, 
+                password: password, 
+                name: name, 
+                role: role, 
+                company_id: companyId 
+            }
         });
 
-    if (profileError) {
-        showToast('Errore salvataggio profilo: ' + profileError.message, 'error');
-        return;
-    }
+        if (error) {
+            throw new Error(error.message || 'Errore durante la chiamata alla funzione');
+        }
 
-    showToast('Nuovo utente creato con successo!');
-    closeCreateUserModal();
-    loadData();
+        showToast('Nuovo utente creato con successo!');
+        closeCreateUserModal();
+        await loadData(); // Aggiorna la lista utenti e dei task mantenendo l'Admin loggato
+
+    } catch (err) {
+        showToast('Errore creazione utente: ' + err.message, 'error');
+        console.error("Errore:", err);
+    }
 }
 
 // --- GESTIONE MODALE MODIFICA UTENTE ---
@@ -276,7 +319,6 @@ async function handleUpdateUser() {
         return;
     }
 
-    // Chiamata alla funzione RPC sul backend di Supabase
     const { data, error } = await _supabase.rpc('admin_update_user', {
         p_user_id: userId,
         p_name: name,
@@ -301,7 +343,6 @@ async function deleteUser(userId) {
     }
     if (!confirm('Sei sicuro di voler eliminare questo utente?')) return;
 
-    // Chiamata alla funzione RPC sul backend di Supabase
     const { data, error } = await _supabase.rpc('admin_delete_user', {
         p_user_id: userId
     });
@@ -317,8 +358,34 @@ async function deleteUser(userId) {
 }
 
 // --- CARICAMENTO DATI ---
+// --- CARICAMENTO DATI ---
 async function loadData() {
     if (!userCompanyId) return;
+
+    // --- VERIFICA SE L'AZIENDA È ATTIVA ---
+    const { data: compData } = await _supabase
+        .from('companies')
+        .select('is_active')
+        .eq('id', userCompanyId)
+        .single();
+
+    if (compData && compData.is_active === false) {
+        // Mostra il messaggio di blocco e al click effettua il logout e il redirect
+        const appContainer = document.getElementById('app-container');
+        if (appContainer) {
+            appContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center min-h-[80vh] text-center p-6">
+                    <div onclick="handleSuspendedLogout()" class="bg-rose-50 text-rose-700 p-8 rounded-3xl border border-rose-100 max-w-md shadow-sm cursor-pointer hover:bg-rose-100 transition">
+                        <h2 class="text-xl font-bold mb-2">Accesso Sospeso</h2>
+                        <p class="text-sm text-rose-600 mb-4">L'account della tua azienda è stato temporaneamente bloccato dall'amministratore di sistema.</p>
+                        <span class="text-xs font-semibold bg-rose-600 text-white px-4 py-2 rounded-xl inline-block">Clicca qui per effettuare il login</span>
+                    </div>
+                </div>
+            `;
+        }
+        return;
+    }
+    // ---------------------------------------
 
     const { data: profilesData } = await _supabase
         .from('profiles')
@@ -352,6 +419,16 @@ async function loadData() {
     allTasks = tasksData || [];
     filterTasks();
 }
+
+// Funzione di supporto per il logout al click sul box di sospensione
+async function handleSuspendedLogout() {
+    await _supabase.auth.signOut();
+    window.location.href = 'index.html';
+}
+
+
+
+
 
 function getActiveUsersList() {
     return Object.keys(allUsersMap).map(id => ({
@@ -438,7 +515,7 @@ function renderTable(tasks) {
     if (counter) counter.innerText = `Totale task visibili: ${tasks.length}`;
 
     if (tasks.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-gray-400">Nessuna attività trovata</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" class="p-6 text-center text-gray-400">Nessuna attività trovata</td></tr>`;
         return;
     }
 
@@ -457,12 +534,21 @@ function renderTable(tasks) {
             day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
         }) : '-';
 
+        const dueDateFormatted = task.due_date ? new Date(task.due_date).toLocaleDateString('it-IT') : '-';
+
         const authorName = allUsersMap[task.user_id] || task.user_email || 'Sconosciuto';
         const assignedName = allUsersMap[task.assigned_to] || 'Non assegnato';
 
         const statusBadge = task.status === 'Evaso' 
             ? `<span class="px-2.5 py-1 text-xs font-medium bg-green-50 text-green-700 rounded-full border border-green-200">Evaso</span>`
             : `<span class="px-2.5 py-1 text-xs font-medium bg-amber-50 text-amber-700 rounded-full border border-amber-200">Attivo</span>`;
+
+        let priorityBadgeClass = 'bg-gray-100 text-gray-700 border-gray-200';
+        const p = task.priority || 'Media';
+        if (p === 'Bassa') priorityBadgeClass = 'bg-slate-50 text-slate-600 border-slate-200';
+        if (p === 'Media') priorityBadgeClass = 'bg-blue-50 text-blue-700 border-blue-200';
+        if (p === 'Alta') priorityBadgeClass = 'bg-orange-50 text-orange-700 border-orange-200';
+        if (p === 'Urgente') priorityBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
 
         let assignOptions = `<option value="">-- Non assegnato --</option>`;
         usersList.forEach(u => {
@@ -473,6 +559,13 @@ function renderTable(tasks) {
         tr.innerHTML = `
             <td class="p-4 pl-6 font-semibold text-gray-900">${escapeHtml(task.task_name)}</td>
             <td class="p-4 text-gray-600 max-w-xs truncate">${escapeHtml(task.task_desc || '-')}</td>
+            <td class="p-4">
+                <span class="px-2.5 py-1 text-xs font-medium bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">${escapeHtml(task.project || 'Generale')}</span>
+            </td>
+            <td class="p-4">
+                <span class="px-2.5 py-1 text-xs font-medium rounded-full border ${priorityBadgeClass}">${escapeHtml(p)}</span>
+            </td>
+            <td class="p-4 text-xs text-gray-600">${dueDateFormatted}</td>
             <td class="p-4">
                 ${isAdmin ? `
                     <div class="text-xs space-y-1">
@@ -520,20 +613,49 @@ function renderTable(tasks) {
 function filterTasks() {
     const searchInput = document.getElementById('search-input');
     const statusFilter = document.getElementById('status-filter');
+    const priorityFilter = document.getElementById('filter-priority');
+    const statusDueFilter = document.getElementById('filter-status-due');
+    const filterDays = document.getElementById('filter-days');
     const filterAssignee = document.getElementById('filter-assignee');
     const filterEseguito = document.getElementById('filter-eseguito');
     
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
     const statusValue = statusFilter ? statusFilter.value : 'ALL';
+    const priorityValue = priorityFilter ? priorityFilter.value : 'ALL';
+    const statusDueValue = statusDueFilter ? statusDueFilter.value : 'ALL';
+    const targetDays = filterDays ? parseInt(filterDays.value) || 0 : 0;
     const assigneeValue = filterAssignee ? filterAssignee.value : 'ALL';
     const eseguitoValue = filterEseguito ? filterEseguito.value : 'ALL';
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     const filtered = allTasks.filter(task => {
         const nameMatch = task.task_name && task.task_name.toLowerCase().includes(searchTerm);
         const descMatch = task.task_desc && task.task_desc.toLowerCase().includes(searchTerm);
-        const matchesSearch = nameMatch || descMatch;
+        const projectMatch = task.project && task.project.toLowerCase().includes(searchTerm);
+        const matchesSearch = nameMatch || descMatch || projectMatch;
 
         const matchesStatus = statusValue === 'ALL' || task.status === statusValue;
+        const matchesPriority = priorityValue === 'ALL' || task.priority === priorityValue;
+
+        let matchesDue = true;
+        if (statusDueValue !== 'ALL') {
+            if (!task.due_date) {
+                matchesDue = false;
+            } else {
+                const dueDate = new Date(task.due_date);
+                dueDate.setHours(0, 0, 0, 0);
+                const diffTime = dueDate - today;
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+                if (statusDueValue === 'scaduto') {
+                    matchesDue = diffDays < 0;
+                } else if (statusDueValue === 'in_scadenza') {
+                    matchesDue = diffDays === targetDays;
+                }
+            }
+        }
 
         let matchesAssignee = true;
         if (userRole === 'admin' && assigneeValue !== 'ALL') {
@@ -545,12 +667,12 @@ function filterTasks() {
         }
 
         let matchesEseguito = true;
-        if (userRole === 'admin' && eseguitoValue !== 'ALL') {
+        if (eseguitoValue !== 'ALL') {
             const isCompleted = eseguitoValue === 'true';
             matchesEseguito = Boolean(task.eseguito) === isCompleted;
         }
 
-        return matchesSearch && matchesStatus && matchesAssignee && matchesEseguito;
+        return matchesSearch && matchesStatus && matchesPriority && matchesDue && matchesAssignee && matchesEseguito;
     });
 
     renderTable(filtered);
@@ -560,11 +682,17 @@ function filterTasks() {
 async function handleAddTask() {
     const nameInput = document.getElementById('task-name');
     const descInput = document.getElementById('task-desc');
+    const projectInput = document.getElementById('task-project');
+    const priorityInput = document.getElementById('task-priority');
+    const dueDateInput = document.getElementById('task-due-date');
     const statusInput = document.getElementById('new-task-status');
     const assigneeInput = document.getElementById('new-task-assignee');
 
     const taskName = nameInput.value.trim();
     const taskDesc = descInput.value.trim();
+    const taskProject = projectInput ? projectInput.value.trim() || 'Generale' : 'Generale';
+    const taskPriority = priorityInput ? priorityInput.value : 'Media';
+    const taskDueDate = dueDateInput ? dueDateInput.value || null : null;
 
     if (!taskName) {
         showToast('Inserisci il titolo del task', 'error');
@@ -581,6 +709,9 @@ async function handleAddTask() {
         .insert([{ 
             task_name: taskName, 
             task_desc: taskDesc, 
+            project: taskProject,
+            priority: taskPriority,
+            due_date: taskDueDate,
             status: taskStatus,
             company_id: userCompanyId, 
             user_id: currentUser.id,
@@ -598,6 +729,9 @@ async function handleAddTask() {
     showToast('Task aggiunto con successo!');
     nameInput.value = '';
     descInput.value = '';
+    if (projectInput) projectInput.value = '';
+    if (dueDateInput) dueDateInput.value = '';
+    if (priorityInput) priorityInput.value = 'Media';
     
     if (userRole === 'admin') {
         if (statusInput) {
@@ -623,6 +757,9 @@ function openEditModal(taskId) {
     document.getElementById('edit-task-id').value = task.id;
     document.getElementById('edit-task-name').value = task.task_name || '';
     document.getElementById('edit-task-desc').value = task.task_desc || '';
+    document.getElementById('edit-task-project').value = task.project || 'Generale';
+    document.getElementById('edit-task-priority').value = task.priority || 'Media';
+    document.getElementById('edit-task-due-date').value = task.due_date || '';
     document.getElementById('edit-task-status').value = task.status || 'Attivo';
 
     const selectAssignee = document.getElementById('edit-task-assignee');
@@ -645,6 +782,9 @@ async function handleUpdateTask() {
     const taskId = document.getElementById('edit-task-id').value;
     const taskName = document.getElementById('edit-task-name').value.trim();
     const taskDesc = document.getElementById('edit-task-desc').value.trim();
+    const project = document.getElementById('edit-task-project').value.trim() || 'Generale';
+    const priority = document.getElementById('edit-task-priority').value;
+    const dueDate = document.getElementById('edit-task-due-date').value || null;
     const status = document.getElementById('edit-task-status').value;
     const assignee = document.getElementById('edit-task-assignee').value || null;
 
@@ -658,6 +798,9 @@ async function handleUpdateTask() {
         .update({
             task_name: taskName,
             task_desc: taskDesc,
+            project: project,
+            priority: priority,
+            due_date: dueDate,
             status: status,
             assigned_to: assignee
         })
